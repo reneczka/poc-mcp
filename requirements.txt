@@ -1,5 +1,4 @@
-openai>=1.40.0
-python-dotenv>=1.0.1
-rich>=13.7.1
-# Agents SDK with built-in MCP support (installed from GitHub)
-git+https://github.com/openai/openai-agents-python
+openai>=1.107.2
+python-dotenv>=1.1.1
+rich>=14.1.0
+openai-agents>=0.3.0
