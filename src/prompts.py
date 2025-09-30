@@ -14,87 +14,36 @@ Use these prefixes in your responses:
 
 Be conversational and explain each step ultra briefly as you work. Include these prefixes in all messages, including your final answer.
 
-Important style rules:
-- Do NOT dump raw tool outputs (like full page HTML/DOM or large JSON). Instead, summarize the tool outcome in 1-2 concise sentences.
-- When you call a tool, first announce it with the 🔧 prefix (what you are doing and why). After it finishes, report success with ✅ and a short result summary.
 - Keep outputs ultra brief and focused on the user's request and avoid unrelated details.
 """
 
-# AGENT_INSTRUCTIONS_TEMPLATE = Template("""
-# 1. go to https://justjoin.it/job-offers/all-locations/python?experience-level=junior&orderBy=DESC&sortBy=newest
-# 2. return urls of 3 first job offers with their names
-# """)
-
 AGENT_INSTRUCTIONS_TEMPLATE = Template("""
-1. go to https://tvn24.pl
-2. return title of the page
-3. put it in airtable create_record tool basing on below data:
-```json
+Scrape 2 junior Python jobs from https://theprotocol.it/filtry/python;t/trainee,assistant,junior;p?sort=date
+
+For each job, extract:
+- Company name
+- Position title
+- Salary (or "Not specified")
+- Location
+- Job link
+- Key requirements/skills
+- Company description (or "Not available")
+
+Create separate Airtable records with this JSON structure:
+
 {
-"baseId": "$base_id",
-"tableId": "$table_id",
-"fields": {
-    "Notes": "Title of the page",
-    "Link": "https://tvn24.pl"
+  "baseId": "$base_id",
+  "tableId": "$table_id",
+  "fields": {
+    "Source": "JustJoin.it",
+    "Link": "[job URL]",
+    "Company": "[company name]",
+    "Position": "[position title]",
+    "Salary": "[salary or 'Not specified']",
+    "Location": "[location]",
+    "Notes": "Junior Python developer position",
+    "Requirements": "[key skills]",
+    "About company": "[description or 'Not available']"
+  }
 }
-}
-```
 """)
-
-# AGENT_INSTRUCTIONS_TEMPLATE = Template("""
-# 1. 
-# Open https://tenderradar.com. Return only the page title and the main heading (h1).
-
-# 2.
-# Your task is to create ONE new record using the create_record tool basing on below data:
-
-# ```json
-# {
-#   "baseId": "$base_id",
-#   "tableId": "$table_id",
-#   "fields": {
-#     "Source": "Example source",
-#     "Link": "https://example.com/job",
-#     "Company": "Example Co",
-#     "Position": "Engineer",
-#     "Salary": "100k-120k",
-#     "Location": "Remote",
-#     "Notes": "Added by agent",
-#     "Requirements": "Python, Playwright",
-#     "About company": "Great team"
-#   }
-# }
-# ```
-# """)
-
-# AGENT_INSTRUCTIONS_TEMPLATE = Template("""
-# You are a Playwright quick tester.
-
-# Open https://tenderradar.com. Return only the page title and the main heading (h1).
-# """)
-
-# AGENT_INSTRUCTIONS_TEMPLATE = Template(
-# """
-# You are an expert Airtable agent.
-
-# Your task is to create ONE new record using the create_record tool basing on below data:
-
-# ```json
-# {
-#   "baseId": "$base_id",
-#   "tableId": "$table_id",
-#   "fields": {
-#     "Source": "Example source",
-#     "Link": "https://example.com/job",
-#     "Company": "Example Co",
-#     "Position": "Engineer",
-#     "Salary": "100k-120k",
-#     "Location": "Remote",
-#     "Notes": "Added by agent",
-#     "Requirements": "Python, Playwright",
-#     "About company": "Great team"
-#   }
-# }
-# ```
-# """
-# )

@@ -11,7 +11,7 @@ from typing import Optional, List, Any
 from rich.console import Console
 from rich.panel import Panel
 
-from config import DEFAULT_OPENAI_MODEL
+from config import DEFAULT_OPENAI_MODEL, MCP_MAX_TURNS
 from prompts import NARRATIVE_INSTRUCTIONS
 
 console = Console()
@@ -40,14 +40,14 @@ class AgentRunner:
             mcp_servers=active_servers,
         )
     
-    async def run_agent_streamed(self, agent: Any, input_text: str) -> Any:
+    async def run_agent_streamed(self, agent: Any, input_text: str, max_turns: int = MCP_MAX_TURNS) -> Any:
         """Execute agent with streaming output"""
         try:
             from agents import Runner, ItemHelpers
         except ImportError as e:
             raise RuntimeError(f"OpenAI Agents SDK not available: {e}")
         
-        streamed = Runner.run_streamed(agent, input=input_text)
+        streamed = Runner.run_streamed(agent, input=input_text, max_turns=max_turns)
         self.console.print(Panel(input_text, title="User", style="magenta"))
         
         async for event in streamed.stream_events():
@@ -87,9 +87,9 @@ def create_web_airtable_agent(playwright_server: Any, airtable_server: Optional[
     )
 
 
-async def run_agent_with_task(agent: Any, task_prompt: str) -> Any:
+async def run_agent_with_task(agent: Any, task_prompt: str, max_turns: int = MCP_MAX_TURNS) -> Any:
     """Run agent with task"""
     runner = AgentRunner()
-    result = await runner.run_agent_streamed(agent, task_prompt)
+    result = await runner.run_agent_streamed(agent, task_prompt, max_turns)
     runner.display_final_result(result)
     return result
