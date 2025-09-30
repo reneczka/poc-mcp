@@ -1,8 +1,8 @@
 """
-MCP Server Management Module
+Playwright MCP Server Management Module
 
-Handles the lifecycle of MCP servers (Playwright and Airtable):
-- Starting and stopping servers
+Handles the lifecycle of the Playwright MCP server:
+- Starting and stopping the server
 - Managing server processes
 - Handling server connections
 """
@@ -16,18 +16,11 @@ from contextlib import asynccontextmanager
 import glob
 
 from rich.console import Console
-from rich.panel import Panel
-
 from mcp_utils import find_free_port
 from config import (
-    MCP_DEFAULT_BROWSER,
-    MCP_DEFAULT_HEADLESS,
     MCP_DEFAULT_SSE_TIMEOUT,
-    MCP_DEFAULT_READY_WAIT_SECONDS,
     MCP_DEFAULT_TOOL_TIMEOUT_SECONDS,
     MCP_PLAYWRIGHT_TIMEOUT_SECONDS,
-    DEFAULT_AIRTABLE_MCP_PACKAGE,
-    AIRTABLE_TOOL_TIMEOUT,
 )
 
 console = Console()
@@ -176,78 +169,29 @@ class PlaywrightServerManager:
             console.log(f"[yellow]Warning during process cleanup: {e}")
 
 
-class AirtableServerConfig:
-    """Configuration for Airtable MCP server"""
-    
-    def __init__(self):
-        self.api_key = os.getenv("AIRTABLE_API_KEY")
-        self.base_id = os.getenv("AIRTABLE_BASE_ID") 
-        self.table_id = os.getenv("AIRTABLE_TABLE_ID")
-        self.package = DEFAULT_AIRTABLE_MCP_PACKAGE
-        self.timeout = AIRTABLE_TOOL_TIMEOUT
-    
-    def is_complete(self) -> bool:
-        """Check if all required Airtable configuration is present"""
-        return all([self.api_key, self.base_id, self.table_id])
-    
-    def setup_environment(self):
-        """Set environment variables for the subprocess"""
-        if self.api_key:
-            os.environ["AIRTABLE_API_KEY"] = self.api_key
-        if self.base_id:
-            os.environ["AIRTABLE_BASE_ID"] = self.base_id
-        if self.table_id:
-            os.environ["AIRTABLE_TABLE_ID"] = self.table_id
-
-
 @asynccontextmanager
-async def create_mcp_servers(airtable_config: AirtableServerConfig):
-    """
-    Context manager that creates and manages both MCP servers
-    
-    Returns:
-        Tuple of (playwright_server, airtable_server)
-        airtable_server may be None if not configured
-    """
-    # Import here to avoid circular imports and handle missing SDK gracefully
+async def create_playwright_server():
+    """Context manager that yields a ready Playwright MCP server"""
     try:
-        from agents.mcp import MCPServerStreamableHttp, MCPServerStdio
+        from agents.mcp import MCPServerStreamableHttp
     except ImportError as e:
         raise RuntimeError(f"OpenAI Agents SDK not available: {e}")
-    
+
     playwright_manager = PlaywrightServerManager()
-    playwright_server = None
-    airtable_server = None
-    
+    server = None
+
     try:
-        # Start Playwright server
         playwright_url = await playwright_manager.start_server()
-        playwright_server = MCPServerStreamableHttp(
+        server = MCPServerStreamableHttp(
             {
                 "url": playwright_url,
                 "timeout": MCP_DEFAULT_SSE_TIMEOUT,
             },
             client_session_timeout_seconds=MCP_DEFAULT_TOOL_TIMEOUT_SECONDS,
         )
-        
-        # Setup Airtable server if configured
-        if airtable_config.is_complete():
-            airtable_config.setup_environment()
-            
-            airtable_server = MCPServerStdio({
-                "command": "npx",
-                "args": ["-y", airtable_config.package],
-                "env": os.environ.copy(),
-                "timeout": airtable_config.timeout,
-            })
-        
-        # Open connections
-        async with playwright_server:
-            if airtable_server:
-                async with airtable_server:
-                    yield playwright_server, airtable_server
-            else:
-                yield playwright_server, None
-    
+
+        async with server:
+            yield server
+
     finally:
         playwright_manager.stop_server()

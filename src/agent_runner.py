@@ -73,17 +73,15 @@ class AgentRunner:
             self.console.print(Panel(final_output, title="Final Output"))
 
 
-def create_web_airtable_agent(playwright_server: Any, airtable_server: Optional[Any]) -> Any:
-    """Create agent with available servers"""
+def create_playwright_agent(playwright_server: Any) -> Any:
+    """Create agent configured with the Playwright MCP server."""
     runner = AgentRunner()
     servers = [playwright_server]
-    if airtable_server:
-        servers.append(airtable_server)
-    
+
     return runner.create_agent(
         name="MCP Agent",
         instructions=NARRATIVE_INSTRUCTIONS,
-        mcp_servers=servers
+        mcp_servers=servers,
     )
 
 
