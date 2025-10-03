@@ -16,18 +16,20 @@ class AirtableConfig:
 
     api_key: Optional[str]
     base_id: Optional[str]
-    table_id: Optional[str]
+    offers_table_id: Optional[str]
+    sources_table_id: Optional[str]
 
     @classmethod
     def from_env(cls) -> "AirtableConfig":
         return cls(
             api_key=os.getenv("AIRTABLE_API_KEY"),
             base_id=os.getenv("AIRTABLE_BASE_ID"),
-            table_id=os.getenv("AIRTABLE_TABLE_ID"),
+            offers_table_id=os.getenv("AIRTABLE_OFFERS_TABLE_ID"),
+            sources_table_id=os.getenv("AIRTABLE_SOURCES_TABLE_ID"),
         )
 
     def is_configured(self) -> bool:
-        return all([self.api_key, self.base_id, self.table_id])
+        return all([self.api_key, self.base_id, self.offers_table_id])
 
 
 class AirtableClient:
@@ -54,7 +56,7 @@ class AirtableClient:
         self._table = Table(
             self.config.api_key,
             self.config.base_id,
-            self.config.table_id,
+            self.config.offers_table_id,
         )
         return self._table
 
@@ -74,6 +76,19 @@ class AirtableClient:
             style="green",
         ))
         return created
+
+    def get_all_records(self, table_id: str) -> List[Dict[str, Any]]:
+        """Fetch all records from a specified table."""
+        try:
+            from pyairtable import Table
+        except ImportError as exc:
+            raise RuntimeError(
+                "pyairtable is not installed. Add it to your environment with\n"
+                "  conda run -n <env> pip install pyairtable"
+            ) from exc
+
+        table = Table(self.config.api_key, self.config.base_id, table_id)
+        return table.all()
 
     @staticmethod
     def _normalize_record(record: Dict[str, Any]) -> Dict[str, Any]:

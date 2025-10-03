@@ -10,10 +10,12 @@ import json
 from rich.console import Console
 from rich.panel import Panel
 
+from config import DEFAULT_DELAY_BETWEEN_SOURCES
+
 from environment_setup import validate_and_setup_environment
 from server_manager import create_playwright_server
 from agent_runner import create_playwright_agent, run_agent_with_task
-from prompts import AGENT_INSTRUCTIONS_TEMPLATE, FALLBACK_TASK_PROMPT
+from prompts import NARRATIVE_INSTRUCTIONS, generate_agent_instructions, FALLBACK_TASK_PROMPT
 from airtable_client import AirtableClient, AirtableConfig
 
 console = Console()
@@ -28,37 +30,78 @@ async def main() -> None:
         airtable_config = AirtableConfig.from_env()
         airtable_enabled = airtable_config.is_configured()
 
-        # Step 2: Build task prompt with Airtable IDs
-        if airtable_enabled:
-            task_prompt = AGENT_INSTRUCTIONS_TEMPLATE.substitute(
-                base_id=airtable_config.base_id,
-                table_id=airtable_config.table_id,
-            )
-        else:
-            # Fallback task for Playwright-only mode
-            task_prompt = FALLBACK_TASK_PROMPT
+        if not airtable_enabled:
+            console.print(Panel(
+                "Airtable not configured. Cannot fetch sources.",
+                title="Error",
+                style="red",
+            ))
+            return
 
-        # Step 3: Start Playwright MCP server and run agent
+        # Step 2: Fetch sources from Airtable
+        client = AirtableClient(airtable_config)
+        sources_table_id = airtable_config.sources_table_id
+        if not sources_table_id:
+            console.print(Panel(
+                "AIRTABLE_SOURCES_TABLE_ID not set in environment.",
+                title="Error",
+                style="red",
+            ))
+            return
+        sources = client.get_all_records(sources_table_id)
+
+        console.print(Panel(f"Fetched {len(sources)} sources from Airtable.", title="Sources", style="blue"))
+
+        if not sources:
+            console.print(Panel(
+                "No sources found in Airtable.",
+                title="Warning",
+                style="yellow",
+            ))
+            return
+
+        all_records = []
+
+        # Step 3: For each source, scrape jobs
         async with create_playwright_server() as playwright_server:
             agent = create_playwright_agent(playwright_server)
 
-            # Execute the task
-            result = await run_agent_with_task(agent, task_prompt)
+            for source_record in sources:
+                fields = source_record.get("fields", {})
+                source_url = fields.get("Job Boards")  # Field is "Job Boards"
 
-        # Step 4: Sync results to Airtable if configured
-        if airtable_enabled:
-            final_output = getattr(result, "final_output", None)
-            records = _parse_records(final_output) if final_output else None
+                if not source_url:
+                    console.print(f"Skipping source {source_record.get('id')} due to missing URL.")
+                    continue
 
-            if records:
-                client = AirtableClient(airtable_config)
-                client.create_records(records)
-            else:
-                console.print(Panel(
-                    "Agent output did not contain valid JSON records.",
-                    title="Airtable",
-                    style="yellow",
-                ))
+                source_name = source_url  # Use URL as name for now
+
+                # Build task prompt
+                task_prompt = generate_agent_instructions(url=source_url, source_name=source_name)
+
+                # Execute the task
+                result = await run_agent_with_task(agent, task_prompt)
+
+                # Parse and collect records
+                final_output = getattr(result, "final_output", None)
+                records = _parse_records(final_output) if final_output else None
+                if records:
+                    all_records.extend(records)
+                else:
+                    console.print(f"No valid records from {source_name}.")
+
+                # Delay between sources to reduce rate limits
+                await asyncio.sleep(DEFAULT_DELAY_BETWEEN_SOURCES)
+
+        # Step 4: Sync all results to Airtable offers table
+        if all_records:
+            client.create_records(all_records)
+        else:
+            console.print(Panel(
+                "No records to add to Airtable.",
+                title="Airtable",
+                style="yellow",
+            ))
 
     except Exception as e:
         console.print(f"Application error: {e}")

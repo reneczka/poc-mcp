@@ -1,5 +1,12 @@
 DEFAULT_OPENAI_MODEL = "gpt-5-nano"
 
+# OpenAI client settings for rate limiting
+DEFAULT_OPENAI_TIMEOUT = 120.0  # Increased from 60.0
+DEFAULT_OPENAI_MAX_RETRIES = 10  # Increased from 3
+
+# Delay between processing sources to reduce rate limits
+DEFAULT_DELAY_BETWEEN_SOURCES = 10  # Seconds
+
 MCP_DEFAULT_BROWSER = "chromium"
 MCP_DEFAULT_HEADLESS = True
 MCP_DEFAULT_SSE_TIMEOUT = 100

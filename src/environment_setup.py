@@ -1,5 +1,4 @@
-"""
-Environment Setup Module
+"""Environment Setup Module.
 
 Handles environment validation and configuration:
 - Loading environment variables
@@ -15,6 +14,9 @@ from dotenv import load_dotenv
 from rich.console import Console
 from rich.panel import Panel
 
+from config import DEFAULT_OPENAI_TIMEOUT, DEFAULT_OPENAI_MAX_RETRIES
+
+
 console = Console()
 
 
@@ -25,7 +27,8 @@ class EnvironmentValidator:
         self.openai_api_key: Optional[str] = None
         self.airtable_api_key: Optional[str] = None
         self.airtable_base_id: Optional[str] = None
-        self.airtable_table_id: Optional[str] = None
+        self.airtable_offers_table_id: Optional[str] = None
+        self.airtable_sources_table_id: Optional[str] = None
     
     def load_environment(self) -> None:
         """Load environment variables from .env file"""
@@ -35,7 +38,8 @@ class EnvironmentValidator:
         self.openai_api_key = os.getenv("OPENAI_API_KEY")
         self.airtable_api_key = os.getenv("AIRTABLE_API_KEY")
         self.airtable_base_id = os.getenv("AIRTABLE_BASE_ID")
-        self.airtable_table_id = os.getenv("AIRTABLE_TABLE_ID")
+        self.airtable_offers_table_id = os.getenv("AIRTABLE_OFFERS_TABLE_ID")
+        self.airtable_sources_table_id = os.getenv("AIRTABLE_SOURCES_TABLE_ID")
     
     def validate_openai_config(self) -> None:
         """Validate OpenAI configuration"""
@@ -57,8 +61,10 @@ class EnvironmentValidator:
             missing_vars.append("AIRTABLE_API_KEY")
         if not self.airtable_base_id:
             missing_vars.append("AIRTABLE_BASE_ID")
-        if not self.airtable_table_id:
-            missing_vars.append("AIRTABLE_TABLE_ID")
+        if not self.airtable_offers_table_id:
+            missing_vars.append("AIRTABLE_OFFERS_TABLE_ID")
+        if not self.airtable_sources_table_id:
+            missing_vars.append("AIRTABLE_SOURCES_TABLE_ID")
         
         if missing_vars:
             console.print(Panel(
@@ -70,6 +76,45 @@ class EnvironmentValidator:
             return False
         
         return True
+    
+    def setup_openai_client(self) -> None:
+        """Configure OpenAI client with rate limiting and timeout settings"""
+        try:
+            import httpx
+            from openai import AsyncOpenAI
+            from agents import set_default_openai_client
+        except ImportError as e:
+            console.print(Panel(
+                f"Required packages not installed: {e}\n"
+                "Install: pip install openai httpx",
+                title="Import Error",
+                style="red",
+            ))
+            return
+        
+        # Create custom client with timeout and retry settings
+        custom_client = AsyncOpenAI(
+            api_key=self.openai_api_key,
+            timeout=DEFAULT_OPENAI_TIMEOUT,
+            max_retries=DEFAULT_OPENAI_MAX_RETRIES,
+            http_client=httpx.AsyncClient(
+                timeout=httpx.Timeout(
+                    connect=10.0,  # Connection timeout
+                    read=DEFAULT_OPENAI_TIMEOUT,  # Match total timeout
+                    write=10.0,    # Write timeout
+                    pool=10.0      # Pool timeout
+                )
+            )
+        )
+        
+        # Set this as the default client for the SDK
+        set_default_openai_client(custom_client)
+        
+        console.print(Panel(
+            f"OpenAI client configured with rate limiting: timeout={DEFAULT_OPENAI_TIMEOUT}s, max_retries={DEFAULT_OPENAI_MAX_RETRIES}.",
+            title="Rate Limiting",
+            style="green",
+        ))
     
     def check_agents_sdk(self) -> None:
         """Check if OpenAI Agents SDK is available"""
@@ -107,4 +152,5 @@ def validate_and_setup_environment() -> EnvironmentValidator:
     validator.check_agents_sdk()
     validator.validate_openai_config()
     validator.validate_airtable_config()
+    validator.setup_openai_client()
     return validator

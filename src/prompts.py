@@ -1,6 +1,6 @@
 """Agent prompts and instructions."""
 
-from string import Template
+from typing import Any
 
 # Fallback task prompt when structured output isn't required
 FALLBACK_TASK_PROMPT = "Say hello to me bro!"
@@ -18,8 +18,10 @@ Be conversational and explain each step ultra briefly as you work. Use the prefi
 When you deliver the final answer, send ONLY a JSON array (no prefixes) that matches the schema below.
 """
 
-AGENT_INSTRUCTIONS_TEMPLATE = Template("""
-Scrape 2 junior Python jobs from https://theprotocol.it/filtry/python;t/trainee,assistant,junior;p?sort=date
+def generate_agent_instructions(url: str, source_name: str) -> str:
+    """Generate agent instructions with dynamic URL and source name."""
+    return f"""
+Scrape 2 junior Python jobs from {url}
 
 Important extraction guidelines:
 
@@ -44,8 +46,8 @@ For each job offer, go to its details page and extract:
 
 Return the final data using this JSON structure:
 ```
-{
-  "Source": "TEST_SOURCE",
+{{
+  "Source": "{source_name}",
   "Link": "[valid job detail page URL]",
   "Company": "[company name]",
   "Position": "[position title]",
@@ -54,8 +56,8 @@ Return the final data using this JSON structure:
   "Notes": "Junior Python developer position",
   "Requirements": "[key skills]",
   "About company": "[description or 'Not available']"
-}
+}}
 ```
 
 Final answer must be a JSON array of objects in the exact format above and contain no other text. Only include offers where you have successfully validated all data.
-""")
+"""
